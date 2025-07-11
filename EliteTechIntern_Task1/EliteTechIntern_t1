@@ -1,0 +1,57 @@
+import pandas as pd 
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder 
+import numpy as np
+
+#Load the CSV file:
+def extract():
+    df = pd.read_csv("AmesHousing.csv", sep=',')
+    print("Data loaded Succesfully.")
+    print(df.shape)
+    return df
+
+#remove unnecessary columns
+def remove_cols(df):
+    df = df.drop(columns=['Order', 'PID', 'Alley', 'Pool QC', 'Fence', 'Misc Feature'])
+    print("Unnecessary columns removed")
+    print("New shape: ", df.shape)
+    print(df.columns)
+    return df
+    
+# Transforming the data
+def transform(df):
+    y=df['SalePrice'] #Target
+    X=df.drop(columns=['SalePrice']) #Feature
+
+    num = X.select_dtypes(include=['int64', 'float64']).columns #numerical features
+    cat = X.select_dtypes(include=['object']).columns #categorical features
+
+    num_pipe=Pipeline([
+        ('imputer', SimpleImputer(strategy='mean')), #fill with mean values
+        ('scaler', StandardScaler()) #scale the values
+    ])
+    cat_pipe=Pipeline([
+        ('imputer', SimpleImputer(strategy='most_frequent')), #fill with most frequent values
+        ('encoder', OneHotEncoder(handle_unknown='ignore')) #encoding categorical values
+    ])
+    #Combining both categorical and numerical features
+    transformer=ColumnTransformer([
+        ('numeric', num_pipe, num),
+        ('categoric', cat_pipe, cat)
+    ])
+    #apply transformation
+    X_transformed = transformer.fit_transform(X)
+    return X_transformed, y
+
+def load(X_transformed):
+    AmesHousing_transformed=pd.DataFrame(X_transformed)
+    print(AmesHousing_transformed.head())
+    AmesHousing_transformed.to_csv("AmesHousing_transformed.csv", index=False)
+    print("✅ ETL complete. Files saved.")
+
+df = extract()
+df = remove_cols(df)
+X_transformed, y = transform(df)
+load(X_transformed)
