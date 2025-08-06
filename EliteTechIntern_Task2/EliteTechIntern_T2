@@ -1,0 +1,97 @@
+# Import Libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import confusion_matrix, classification_report
+
+#  Load Dataset
+data = pd.read_json("News_Category_Dataset_v3.json", lines=True)
+data = data[['headline', 'category']]
+data = data.dropna()
+
+top_categories = data['category'].value_counts().nlargest(10).index
+data = data[data['category'].isin(top_categories)]
+
+# Encode Labels
+le = LabelEncoder()
+data['label'] = le.fit_transform(data['category'])
+
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(
+    data['headline'], data['label'], test_size=0.2, random_state=42, stratify=data['label']
+)
+
+# Text Vectorization
+vectorizer = tf.keras.layers.TextVectorization(max_tokens=10000, output_sequence_length=20)
+vectorizer.adapt(X_train)
+X_train_vec = vectorizer(X_train)
+X_test_vec = vectorizer(X_test)
+
+#  Build Model
+num_classes = len(np.unique(y_train))
+model = tf.keras.Sequential([
+    tf.keras.layers.Embedding(input_dim=10000, output_dim=64),
+    tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64)),
+    tf.keras.layers.Dense(64, activation='relu'),
+    tf.keras.layers.Dense(num_classes, activation='softmax')
+])
+model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+#  Train Model
+history = model.fit(X_train_vec, y_train, epochs=5, validation_data=(X_test_vec, y_test))
+
+# Plot Accuracy & Loss
+plt.figure(figsize=(12, 4))
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'], label='train')
+plt.plot(history.history['val_accuracy'], label='val')
+plt.title('Accuracy')
+plt.legend()
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'], label='train')
+plt.plot(history.history['val_loss'], label='val')
+plt.title('Loss')
+plt.legend()
+plt.show()
+
+# Confusion Matrix
+y_pred = model.predict(X_test_vec)
+y_pred_classes = np.argmax(y_pred, axis=1)
+cm = confusion_matrix(y_test, y_pred_classes)
+plt.figure(figsize=(10, 8))
+sns.heatmap(cm, annot=True, fmt='d', xticklabels=le.classes_, yticklabels=le.classes_)
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix")
+plt.show(block=False)
+
+# Classification Report
+print(classification_report(y_test, y_pred_classes, target_names=le.classes_))
+
+#Show Sample Predictions
+for i in range(5):
+    print(f"\nHeadline: {X_test.iloc[i]}")
+    print(f"True Label: {le.inverse_transform([y_test.iloc[i]])[0]}")
+    print(f"Predicted: {le.inverse_transform([y_pred_classes[i]])[0]}")
+
+ #User Input Prediction
+while True:
+    user_input = input("\nEnter a news headline (or type 'exit' to quit): ")
+
+    if user_input.lower() == 'exit':
+        print("Exiting prediction loop.")
+        break
+
+    vec = vectorizer([user_input])
+
+    pred = model.predict(vec)
+    class_id = pred.argmax(axis=1)[0]
+    label = le.inverse_transform([class_id])[0]
+
+    # Output
+    print(f"🔮 Predicted Category: {label}")
+
