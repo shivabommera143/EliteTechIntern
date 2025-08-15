@@ -9,9 +9,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
 import uvicorn
-import os
 
-DATASET_PATH = r"D:\shiva-py\EliteTechIntern_Task2\EliteTechIntern_Task3\spam.csv"
+# Paths
+DATASET_PATH = Path("spam.csv")
 MODEL_PATH = Path("spam_pipeline.joblib")
 
 app = FastAPI()
@@ -44,42 +44,6 @@ def load_model():
 
 model = load_model()
 
-
-if not os.path.exists("templates"):
-    os.makedirs("templates")
-
-index_html = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Spam Detector</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f4; text-align: center; padding: 50px; }
-        h1 { color: #333; }
-        form { background: white; padding: 20px; border-radius: 10px; display: inline-block; }
-        textarea { width: 300px; height: 100px; margin-bottom: 20px; }
-        button { padding: 10px 20px; background-color: #28a745; border: none; color: white; cursor: pointer; }
-        button:hover { background-color: #218838; }
-        .result { margin-top: 20px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <h1>SMS Spam Detector</h1>
-    <form method="post" action="/predict">
-        <textarea name="message" placeholder="Enter your message here"></textarea><br>
-        <button type="submit">Check</button>
-    </form>
-    {% if prediction %}
-        <div class="result">Prediction: {{ prediction }}</div>
-    {% endif %}
-</body>
-</html>
-"""
-
-with open("templates/index.html", "w", encoding="utf-8") as f:
-    f.write(index_html)
-
-
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -88,7 +52,6 @@ async def home(request: Request):
 async def predict(request: Request, message: str = Form(...)):
     prediction = model.predict([message])[0]
     return templates.TemplateResponse("index.html", {"request": request, "prediction": prediction})
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
